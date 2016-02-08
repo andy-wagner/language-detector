@@ -81,17 +81,23 @@ public class Util {
     }
 
 
-    public static String wordProbToString(double[] prob, List<LdLocale> langlist) {
+    public static String wordProbToString(double[] prob, List<LdLocale> langlist, List<LdLocale> validLanguages) {
         Formatter formatter = new Formatter();
         for(int j=0;j<prob.length;++j) {
             double p = prob[j];
-            if (p>=0.00001) {
-                formatter.format(" %s:%.5f", langlist.get(j), p);
+            LdLocale lang = langlist.get(j);
+            if (p>=-0.00001 && (validLanguages == null || validLanguages.contains(lang))) {
+                formatter.format(";%s;%.5f", lang, p);
             }
         }
         return formatter.toString();
     }
-
+    
+    public static String wordProbToString(double[] prob, List<LdLocale> langlist) {
+        return wordProbToString(prob, langlist, null);
+    }
+    
+    
 
     /**
      */

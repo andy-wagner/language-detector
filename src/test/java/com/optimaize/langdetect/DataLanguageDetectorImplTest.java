@@ -1,8 +1,12 @@
 package com.optimaize.langdetect;
 
+import com.optimaize.langdetect.ngram.NgramExtractor;
 import com.optimaize.langdetect.ngram.NgramExtractors;
+import com.optimaize.langdetect.ngram.StandardNgramFilter;
 import com.optimaize.langdetect.profiles.LanguageProfileReader;
 import com.optimaize.langdetect.text.CommonTextObjectFactories;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -16,17 +20,22 @@ public class DataLanguageDetectorImplTest {
 
     @Test
     public void shortTextAlgo() throws IOException {
-        LanguageDetector detector = LanguageDetectorBuilder.create(NgramExtractors.standard())
-                .shortTextAlgorithm(100)
+    	NgramExtractor extract = NgramExtractor
+                .gramLengths(1, 2, 3)
+                .filter(StandardNgramFilter.getInstance())
+                .textPadding(' ');
+        LanguageDetector detector = LanguageDetectorBuilder.create(extract)
+                .shortTextAlgorithm(150)
                 .withProfiles(new LanguageProfileReader().readAllBuiltIn())
                 .build();
         runTests(detector);
     }
 
+    @Ignore
     @Test
     public void longTextAlgo() throws IOException {
         LanguageDetector detector = LanguageDetectorBuilder.create(NgramExtractors.standard())
-                .shortTextAlgorithm(0)
+                .shortTextAlgorithm(150)
                 .withProfiles(new LanguageProfileReader().readAllBuiltIn())
                 .build();
         runTests(detector);
@@ -39,6 +48,8 @@ public class DataLanguageDetectorImplTest {
      * The long text algorithm returns either a 0.9999something (often), or a much lower 0.7something (sometimes).
      */
     private void runTests(LanguageDetector detector) {
+    	// assertEquals(detector.getProbabilities("findet morgen um 11.00 Uhr statt").get(0).getLocale().getLanguage(), "de");
+    	assertEquals(detector.getProbabilities(text("Hans bortgang var et personligt tab for mig, tabet af en gammel ven, som jeg delte mange stunder af mit liv med, og som jeg vil savne meget.")).get(0).getLocale().getLanguage(), "da");
         assertEquals(detector.getProbabilities(text("This is some English text.")).get(0).getLocale().getLanguage(), "en");
         assertEquals(detector.getProbabilities(text("Ceci est un texte français.")).get(0).getLocale().getLanguage(), "fr");
         assertEquals(detector.getProbabilities(text("Dit is een Nederlandse tekst.")).get(0).getLocale().getLanguage(), "nl");

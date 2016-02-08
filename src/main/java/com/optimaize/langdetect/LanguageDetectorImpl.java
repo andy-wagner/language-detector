@@ -44,9 +44,11 @@ public final class LanguageDetectorImpl implements LanguageDetector {
     private static final int BASE_FREQ = 10000;
 
     /**
-     * TODO document what this is for, and why that value is chosen.
+     * Number of samples to obtain for normal/short texts.
      */
     private static final int N_TRIAL = 7;
+	private static final int N_TRIAL_SHORT = 5;
+
 
     /**
      * This is used when no custom seed was passed in.
@@ -154,15 +156,36 @@ public final class LanguageDetectorImpl implements LanguageDetector {
     /**
      */
     private double[] detectBlockShortText(Map<String, Integer> ngrams) {
-        double[] prob = initProbability();
-        double alpha = this.alpha; //TODO I don't understand what this does.
-        for (Map.Entry<String, Integer> gramWithCount : ngrams.entrySet()) {
-            updateLangProb(prob, gramWithCount.getKey(), gramWithCount.getValue(), alpha);
-            if (Util.normalizeProb(prob) > CONV_THRESHOLD) break; //this break ensures that we quit the loop before all probabilities reach 0
+    	double[] langprob = new double[ngramFrequencyData.getLanguageList().size()];
+    	Random rand = new Random(seed.or(DEFAULT_SEED));
+        List<String> ngramList = new ArrayList<>(ngrams.keySet());
+        
+        for (int t = 0; t < N_TRIAL_SHORT; ++t) {
+        	double[] prob = initProbability();
+        	double alpha = this.alpha + (rand.nextGaussian() * ALPHA_WIDTH);
+            int i = 0;
+            int run = 0;
+            // for (Map.Entry<String, Integer> gramWithCount : ngrams.entrySet().stream().sorted(Comparator.<Map.Entry<String, Integer>>comparingInt( ng -> ng.getKey().length()).reversed()).collect(Collectors.toList())) {
+            for (int j=ngramList.size()/3*t;; ++j){
+            	if (j>ngramList.size()-2) {
+            		if (run > 0) {
+            			break;
+            		}
+            		j = 0;
+            		run ++;
+            	}
+            	String ngram = ngramList.get(j);
+                updateLangProb(prob, ngram, ngrams.get(ngram), alpha);
+                if (i%5 == 0) {
+                	if (Util.normalizeProb(prob) > CONV_THRESHOLD) break; //this break ensures that we quit the loop before all probabilities reach 0
+                }
+                i += 1;
+            }
+            Util.normalizeProb(prob);    
+            for(int j=0;j<langprob.length;++j) langprob[j] += prob[j] / N_TRIAL_SHORT;
         }
-        Util.normalizeProb(prob);
-        if (logger.isDebugEnabled()) logger.debug("==> " + sortProbability(prob));
-        return prob;
+        if (logger.isDebugEnabled()) logger.debug("==> " + sortProbability(langprob));
+        return langprob;
     }
 
     /**
@@ -185,6 +208,7 @@ public final class LanguageDetectorImpl implements LanguageDetector {
                     if (logger.isTraceEnabled()) logger.trace("> " + sortProbability(prob));
                 }
             }
+            Util.normalizeProb(prob);
             for(int j=0;j<langprob.length;++j) langprob[j] += prob[j] / N_TRIAL;
             if (logger.isDebugEnabled()) logger.debug("==> " + sortProbability(prob));
         }
@@ -218,7 +242,10 @@ public final class LanguageDetectorImpl implements LanguageDetector {
         if (langProbMap==null) {
             return false;
         }
-        if (logger.isTraceEnabled()) logger.trace(ngram + "(" + Util.unicodeEncode(ngram) + "):" + Util.wordProbToString(langProbMap, ngramFrequencyData.getLanguageList()));
+//        System.out.println(Util.unicodeEncode(ngram) + ";" + 
+//        		Util.wordProbToString(langProbMap, ngramFrequencyData.getLanguageList(), 
+//        				Arrays.asList(LdLocale.fromString("de"), LdLocale.fromString("sv"), LdLocale.fromString("en"), LdLocale.fromString("fr"))));
+//        if (logger.isTraceEnabled()) logger.trace(ngram + "(" + Util.unicodeEncode(ngram) + "):" + Util.wordProbToString(langProbMap, ngramFrequencyData.getLanguageList()));
 
         double weight = alpha / BASE_FREQ;
         if (ngram.length() >1) {
@@ -228,8 +255,9 @@ public final class LanguageDetectorImpl implements LanguageDetector {
                 weight *= suffixFactor;
             }
         }
+
         for (int i=0; i<prob.length; ++i) {
-        	prob[i] *= Math.pow(weight + langProbMap[i], count);
+        		prob[i] *= Math.pow(weight +  langProbMap[i] * Math.log(ngram.length()+1), count);
         }
         return true;
     }
